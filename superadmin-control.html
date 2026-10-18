@@ -43,7 +43,29 @@ function statusBadge(s){const v=String(s||"").toLowerCase();if(["activa","activo
 function go(name){document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));$("section-"+name)?.classList.add("active");document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active",b.dataset.section===name));const b=document.querySelector('#nav button[data-section="'+name+'"]');$("pageTitle").textContent=b?b.textContent.trim().replace(/\s+\d+$/,""):"Administración";window.scrollTo({top:0,behavior:"smooth"})}
 document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>go(b.dataset.section));document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
 async function boot(){try{const {data,error}=await db.auth.getSession();if(error)throw error;session=data.session;if(!session){$("auth").classList.remove("hidden");$("app").classList.add("hidden");return}const {data:ok,error:roleError}=await db.rpc("sp_admin_es_superadmin");if(roleError||ok!==true){await db.auth.signOut();$("auth").classList.remove("hidden");$("app").classList.add("hidden");say("msg","Esta cuenta no está autorizada como Superadministrador.",true);return}$("auth").classList.add("hidden");$("app").classList.remove("hidden");$("who").textContent=session.user.email||"Superadministrador";await load()}catch(e){$("auth").classList.remove("hidden");say("msg","No se pudo verificar el acceso: "+e.message,true)}}
-async function load(){say("result","Consultando datos reales de Supabase…");const [fr,pr]=await Promise.all([db.rpc("sp_admin_listar_financieras"),db.rpc("sp_admin_listar_planes")]);if(fr.error){say("result","No se pudieron cargar las financieras: "+fr.error.message,true);return}if(pr.error){say("result","No se pudieron cargar los planes: "+pr.error.message,true);return}finances=Array.isArray(fr.data)?fr.data:[];plans=Array.isArray(pr.data)?pr.data:[];const pending=finances.filter(f=>String(f.estado).toLowerCase()==="pendiente").length;$("total").textContent=finances.length;$("pending").textContent=pending;$("active").textContent=finances.filter(f=>String(f.estado).toLowerCase()==="activa").length;$("planCount").textContent=plans.length;$("navPending").textContent=pending;$("requestCount").textContent=pending+" pendientes";renderCompanies();renderRequests();renderPlans();renderRecent();renderModules();renderOperations();$("lastUpdate").textContent="Actualizado "+new Date().toLocaleTimeString("es-PE");say("result","Datos administrativos actualizados.");}
+async function load(){
+ say("result","Consultando datos administrativos…");
+ const [fr,pr]=await Promise.all([
+  db.rpc("sp_admin_listar_financieras"),
+  db.rpc("sp_admin_listar_planes")
+ ]);
+ finances=(!fr.error&&Array.isArray(fr.data))?fr.data:[];
+ plans=(!pr.error&&Array.isArray(pr.data))?pr.data:[];
+ const pending=finances.filter(f=>String(f.estado).toLowerCase()==="pendiente").length;
+ $("total").textContent=fr.error?"—":finances.length;
+ $("pending").textContent=fr.error?"—":pending;
+ $("active").textContent=fr.error?"—":finances.filter(f=>String(f.estado).toLowerCase()==="activa").length;
+ $("planCount").textContent=pr.error?"—":plans.length;
+ $("navPending").textContent=fr.error?"!":pending;
+ $("requestCount").textContent=fr.error?"No disponible":pending+" pendientes";
+ renderCompanies();renderRequests();renderPlans();renderRecent();
+ renderModules();renderOperations();
+ $("lastUpdate").textContent="Actualizado "+new Date().toLocaleTimeString("es-PE");
+ if(fr.error||pr.error){
+  const errors=[fr.error?"Financieras: "+fr.error.message:"",pr.error?"Planes: "+pr.error.message:""].filter(Boolean).join(" · ");
+  say("result","Algunos datos administrativos no se pudieron cargar. Los módulos siguen disponibles para abrir y comprobar. "+errors,true);
+ }else say("result","Datos administrativos actualizados.");
+}
 function companyRow(f,withActions=true){const state=esc(f.estado||"Sin estado");const planOptions=plans.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===f.plan_id?'selected':'')+'>'+esc(p.nombre)+' — S/ '+esc(p.precio_mensual)+'/mes</option>').join("");return '<tr><td><b>'+esc(f.nombre)+'</b><div class="muted small">'+esc(f.correo||"Sin correo")+'</div></td><td>'+esc(f.ruc||"—")+'</td><td><span class="badge '+statusBadge(f.estado)+'">'+state+'</span></td><td>'+esc(f.plan_nombre||"Sin plan")+'</td><td>'+(withActions?'<div class="actions">'+(f.estado==="pendiente"?'<button data-approve="'+esc(f.id)+'">Aprobar</button><button class="danger" data-reject="'+esc(f.id)+'">Rechazar</button>':'')+(f.estado==="activa"&&plans.length?'<select aria-label="Plan" data-plan="'+esc(f.id)+'" style="max-width:170px;padding:8px;border:1px solid var(--line);border-radius:8px">'+planOptions+'</select><button class="secondary" data-assign="'+esc(f.id)+'">Guardar plan</button>':'')+'</div>':'—')+'</td></tr>'}
 function tableCompanies(arr,actions=true){return arr.length?'<div class="tablewrap"><table><thead><tr><th>Financiera</th><th>RUC</th><th>Estado</th><th>Plan</th><th>Acciones</th></tr></thead><tbody>'+arr.map(f=>companyRow(f,actions)).join("")+'</tbody></table></div>':'<div class="empty">No hay financieras registradas. Los indicadores en cero reflejan los datos que devuelve Supabase.</div>'}
 function renderCompanies(){const q=($("companySearch")?.value||"").toLowerCase().trim();$("companiesList").innerHTML=tableCompanies(finances.filter(f=>[f.nombre,f.correo,f.ruc,f.estado].some(v=>String(v||"").toLowerCase().includes(q))));wireActions()}
@@ -100,5 +122,6 @@ async function loadModuleData(){
  }
 }
 
+renderModules();
 boot();
 </script></body></html>
