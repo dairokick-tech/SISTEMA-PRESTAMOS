@@ -108,8 +108,8 @@ async function checkModules(){
 function renderModules(){
 $("moduleGrid").innerHTML=moduleDefs.map((m,i)=>{
  const r=moduleResults[m.title];
- const badge=r?(r.ok?'<span class="badge ok">Acceso comprobado</span>':'<span class="badge bad">Acceso incompleto</span>'):'<span class="badge">Listo para abrir</span>';
- const detail=m.tables.map(esc).join(" · ");
+ const badge=r?('<span class="badge '+(r.status==="Accesible"?"ok":r.status==="Sin datos"?"wait":"bad")+'">'+esc(r.status)+'</span>'):'<span class="badge">Pendiente de prueba</span>';
+ const detail=m.tables.map(t=>{const ck=r&&r.checks.find(x=>x.table===t);return esc(t)+(ck?' — '+esc(ck.status)+(ck.error?' ('+esc(ck.error)+')':''):'')}).join(" · ");
  return '<div class="modulecard"><div class="moduletop"><div class="moduleicon">'+m.icon+'</div>'+badge+'</div><h3>'+esc(m.title)+'</h3><p>'+esc(m.desc)+'</p><div class="muted small">Tablas: '+detail+'</div><div class="mod-actions"><button data-openmodule="'+i+'">Abrir módulo →</button></div></div>';
 }).join("");
 document.querySelectorAll("[data-openmodule]").forEach(b=>b.onclick=()=>openModule(Number(b.dataset.openmodule)));
