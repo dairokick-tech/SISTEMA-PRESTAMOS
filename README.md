@@ -8,7 +8,7 @@ Portal web de clientes para financieras, con un enlace independiente por empresa
 - Simulador referencial de crédito con tasas periódicas o TEA y cuatro métodos de amortización.
 - Inicio de sesión con Supabase Auth para clientes.
 - Consulta de créditos y cuotas propios, condicionada a que la financiera vincule la cuenta de acceso con su ficha de cliente.
-- Diseño adaptable a móvil y computadora.
+- Diseño adaptable a móvil y computadora.\n- Panel de financieras para solicitar registro, configurar el portal público, publicar campañas y revisar solicitudes entrantes (según permisos de la cuenta).
 
 ## Tecnología
 - HTML, CSS y JavaScript.
@@ -27,4 +27,4 @@ La base de datos crea automáticamente un registro de portal al registrar una fi
 - Las solicitudes recibidas desde la página son solicitudes preliminares, no créditos aprobados.
 - La simulación es estimada y no reemplaza la evaluación, el contrato ni el cronograma definitivo.
 - No se debe activar el acceso a créditos de un cliente hasta verificar su identidad y asociar su cuenta de Supabase al registro correcto.
-- Para publicar, conecta este repositorio a Netlify o habilita GitHub Pages para la rama `main`. Aún debe configurarse el portal de cada financiera antes de que su enlace individual muestre datos.
+- El repositorio incluye un flujo de GitHub Actions para publicar los archivos estáticos en GitHub Pages al actualizar `main`. Revisa la pestaña **Actions** y, cuando termine correctamente, la dirección publicada aparecerá en el registro del flujo. Si GitHub solicita habilitar Pages, ve a **Settings → Pages** y selecciona la publicación mediante GitHub Actions.\n- El panel de financieras está en `panel.html`. Las solicitudes de registro quedan en estado pendiente; el panel no permite autoaprobar una financiera.\n- La página individual de cada financiera debe configurarse y publicarse desde el panel después de que la cuenta tenga permisos.\n- El sistema completo de operaciones de préstamos (originación, evaluación, aprobación, desembolso, cobranzas, caja y reportes) aún requiere completar sus pantallas y pruebas; este portal/panel no debe considerarse todavía una solución financiera lista para producción.
