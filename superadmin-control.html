@@ -75,7 +75,36 @@ function renderPlans(){ $("plansList").innerHTML=plans.length?'<div class="table
 function wireActions(){document.querySelectorAll("[data-approve]").forEach(b=>b.onclick=()=>decide(b.dataset.approve,"aprobar",b));document.querySelectorAll("[data-reject]").forEach(b=>b.onclick=()=>decide(b.dataset.reject,"rechazar",b));document.querySelectorAll("[data-assign]").forEach(b=>b.onclick=()=>assign(b.dataset.assign,b))}
 async function decide(id,decision,b){if(decision==="aprobar"&&!confirm("Se intentará enviar el correo para crear contraseña y solicitar la activación de la financiera. ¿Continuar?"))return;b.disabled=true;try{const f=finances.find(x=>x.id===id);if(!f)throw Error("No se encontró la financiera");if(decision==="aprobar"){if(!f.correo)throw Error("Falta el correo de acceso");const {error}=await db.auth.resetPasswordForEmail(f.correo,{redirectTo:"https://dairokick-tech.github.io/SISTEMA-PRESTAMOS/crear-contrasena.html"});if(error)throw error}const {error}=await db.rpc("sp_admin_decidir_financiera",{p_financiera_id:id,p_decision:decision});if(error)throw error;alert(decision==="aprobar"?"La operación fue aceptada por Supabase. Verifica la entrega del correo.":"Solicitud rechazada.");await load()}catch(e){alert("No se completó la operación: "+e.message)}finally{b.disabled=false}}
 async function assign(id,b){const sel=document.querySelector('[data-plan="'+CSS.escape(id)+'"]');if(!sel)return;const p=plans.find(x=>x.id===sel.value);if(!p)return;b.disabled=true;try{const {error}=await db.rpc("sp_admin_asignar_plan",{p_financiera_id:id,p_plan_id:p.id,p_vence_en:null,p_notas:null});if(error)throw error;alert("Supabase confirmó la asignación del plan "+p.nombre+".");await load()}catch(e){alert("No se pudo asignar el plan: "+e.message)}finally{b.disabled=false}}
-async function checkModules(){const grid=$("moduleGrid");grid.innerHTML='<div class="empty">Comprobando acceso a tablas…</div>';const results=await Promise.all(moduleDefs.map(async m=>{const checks=await Promise.all(m.tables.map(async t=>{try{const {error}=await db.from(t).select("*",{count:"exact",head:true});return {table:t,ok:!error,error:error?.message}}catch(e){return {table:t,ok:false,error:e.message}}}));return {...m,checks,ok:checks.every(c=>c.ok)}}));moduleResults=Object.fromEntries(results.map(r=>[r.title,r]));renderModules();const ok=results.filter(r=>r.ok).length;$("healthSummary").innerHTML='<div class="statusline"><span>Tablas accesibles</span><b>'+results.reduce((n,r)=>n+r.checks.filter(c=>c.ok).length,0)+' / '+results.reduce((n,r)=>n+r.checks.length,0)+'</b></div><div class="statusline"><span>Módulos con acceso a todas sus tablas</span><b>'+ok+' / '+results.length+'</b></div><p class="muted small">Un acceso correcto confirma lectura, no todas las operaciones de escritura.</p>'}
+async function checkModules(){
+ const grid=$("moduleGrid");
+ grid.innerHTML='<div class="empty">Comprobando acceso real mediante Supabase…</div>';
+ const results=await Promise.all(moduleDefs.map(async m=>{
+  const checks=await Promise.all(m.tables.map(async t=>{
+   try{
+    const {data,error}=await db.rpc("sp_admin_listar_modulo",{p_tabla:t,p_financiera_id:null,p_limite:1});
+    if(error){
+     const msg=String(error.message||error);
+     const denied=/permission|denied|not authorized|unauthorized|superadministrador|módulo no permitido|module not allowed|42501/i.test(msg);
+     return {table:t,ok:false,status:denied?"Sin acceso":"Error de consulta",error:msg};
+    }
+    const rows=Array.isArray(data)?data:[];
+    return {table:t,ok:true,status:rows.length?"Accesible":"Sin datos",error:""};
+   }catch(e){
+    const msg=String(e?.message||e);
+    const denied=/permission|denied|not authorized|unauthorized|superadministrador|módulo no permitido|module not allowed|42501/i.test(msg);
+    return {table:t,ok:false,status:denied?"Sin acceso":"Error de conexión",error:msg};
+   }
+  }));
+  const denied=checks.some(x=>x.status==="Sin acceso");
+  const failed=checks.some(x=>!x.ok);
+  return {...m,checks,ok:checks.every(x=>x.ok),status:denied?"Sin acceso":failed?"Error de consulta":checks.every(x=>x.status==="Sin datos")?"Sin datos":"Accesible"};
+ }));
+ moduleResults=Object.fromEntries(results.map(r=>[r.title,r]));
+ renderModules();
+ const all=results.flatMap(r=>r.checks);
+ const count=s=>all.filter(x=>x.status===s).length;
+ $("healthSummary").innerHTML='<div class="statusline"><span>Accesibles</span><b>'+count("Accesible")+'</b></div><div class="statusline"><span>Sin datos (consulta correcta)</span><b>'+count("Sin datos")+'</b></div><div class="statusline"><span>Sin acceso</span><b>'+count("Sin acceso")+'</b></div><div class="statusline"><span>Error de consulta/conexión</span><b>'+all.filter(x=>x.status==="Error de consulta"||x.status==="Error de conexión").length+'</b></div><p class="muted small">La comprobación usa la misma función RPC que abre los registros. Un resultado vacío no se confunde con un error de permisos.</p>';
+}
 function renderModules(){
 $("moduleGrid").innerHTML=moduleDefs.map((m,i)=>{
  const r=moduleResults[m.title];
